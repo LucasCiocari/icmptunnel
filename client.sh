@@ -7,5 +7,5 @@ ifconfig tun0 mtu 1472 up 10.0.1.2 netmask 255.255.255.0
 route del default
 # 'server' is the IP address of the proxy server
 # 'gateway' and 'interface' can be obtained by usint the command: 'route -n'
-route add -host 10.0.1.1 gw 0.0.0.0 dev eth0
+route add -host 10.32.143.193 gw 10.32.143.1 dev enp4s0
 route add default gw 10.0.1.1 tun0

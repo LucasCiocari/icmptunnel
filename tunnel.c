@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#define DEFAULT_IF	"enp4s0"
 
 #define DEFAULT_ROUTE   "0.0.0.0"
 
@@ -148,6 +149,10 @@ void configure_network(int server)
     }
   }
 }
+char this_mac[6];
+char bcast_mac[6] =	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+char dst_mac[6] =	{0x00, 0x00, 0x00, 0x22, 0x22, 0x22};
+char src_mac[6] =	{0x00, 0x00, 0x00, 0x33, 0x33, 0x33};
 
 
 /**
@@ -158,18 +163,43 @@ void run_tunnel(char *dest, int server)
   struct icmp_packet packet;
   int tun_fd, sock_fd;
 
+  struct ifreq if_idx, if_mac, ifopts;
+	char ifName[IFNAMSIZ];
+	int numbytes;
+
   fd_set fs;
 
   tun_fd = tun_alloc("tun0", IFF_TUN | IFF_NO_PI);
 
   printf("[DEBUG] Starting tunnel - Dest: %s, Server: %d\n", dest, server);
   printf("[DEBUG] Opening ICMP socket\n");
-  sock_fd = open_icmp_socket();
+  
+  strcpy(ifName, DEFAULT_IF);
 
-  if (server) {
-    printf("[DEBUG] Binding ICMP socket\n");
-    bind_icmp_socket(sock_fd);
-  }
+  /* Open RAW socket */
+	if ((sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
+		perror("socket");
+
+	/* Set interface to promiscuous mode */
+	strncpy(ifopts.ifr_name, ifName, IFNAMSIZ-1);
+	ioctl(sock_fd, SIOCGIFFLAGS, &ifopts);
+	ifopts.ifr_flags |= IFF_PROMISC;
+	ioctl(sock_fd, SIOCSIFFLAGS, &ifopts);
+
+	/* Get the index of the interface */
+	memset(&if_idx, 0, sizeof(struct ifreq));
+	strncpy(if_idx.ifr_name, ifName, IFNAMSIZ-1);
+	if (ioctl(sock_fd, SIOCGIFINDEX, &if_idx) < 0)
+		perror("SIOCGIFINDEX");
+	// socket_address.sll_ifindex = if_idx.ifr_ifindex;
+	// socket_address.sll_halen = ETH_ALEN;
+
+	/* Get the MAC address of the interface */
+	memset(&if_mac, 0, sizeof(struct ifreq));
+	strncpy(if_mac.ifr_name, ifName, IFNAMSIZ-1);
+	if (ioctl(sock_fd, SIOCGIFHWADDR, &if_mac) < 0)
+		perror("SIOCGIFHWADDR");
+	memcpy(this_mac, if_mac.ifr_hwaddr.sa_data, 6);
 
   configure_network(server);
 
